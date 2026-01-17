@@ -1,0 +1,213 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum Channel {
+  whatsapp
+  messenger
+  instagram
+  tiktok
+}
+
+enum CustomerStatus {
+  new
+  contacted
+  qualified
+  unqualified
+  demo
+  won
+}
+
+enum DealStatus {
+  Won
+  Lost
+  InProgress
+}
+
+enum EmailFolder {
+  inbox
+  sent
+  drafts
+  trash
+}
+
+enum MessageSender {
+  user
+  customer
+}
+
+enum IntegrationStatus {
+  connected
+  disconnected
+}
+
+enum ServiceStatusType {
+  operational
+  degraded
+  outage
+}
+
+enum SupportMessageSender {
+  user
+  support
+}
+
+// Models
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages       Message[]
+  supportMessages SupportMessage[]
+  sentEmails     Email[]          @relation("SentEmails")
+}
+
+model Customer {
+  id        String         @id @default(uuid())
+  name      String
+  email     String         @unique
+  phone     String?
+  avatarUrl String?
+  joined    DateTime       @default(now())
+  channel   Channel
+  status    CustomerStatus @default(new)
+  dealName  String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  tags          CustomerTag[]
+  deals         Deal[]
+  conversations Conversation[]
+}
+
+model CustomerTag {
+  id         String   @id @default(uuid())
+  name       String
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, name])
+}
+
+model Deal {
+  id         String     @id @default(uuid())
+  name       String
+  status     DealStatus @default(InProgress)
+  amount     Float
+  closeDate  DateTime?
+  customerId String
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+model Conversation {
+  id          String   @id @default(uuid())
+  channel     Channel
+  unreadCount Int      @default(0)
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  messages Message[]
+}
+
+model Message {
+  id             String        @id @default(uuid())
+  text           String        @db.Text
+  sender         MessageSender
+  timestamp      DateTime      @default(now())
+  conversationId String
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?         @relation(fields: [userId], references: [id])
+
+  @@index([conversationId])
+}
+
+model Email {
+  id        String      @id @default(uuid())
+  fromName  String
+  fromEmail String
+  fromAvatar String?
+  subject   String
+  body      String      @db.Text
+  timestamp DateTime    @default(now())
+  isRead    Boolean     @default(false)
+  folder    EmailFolder @default(inbox)
+  userId    String?
+  user      User?       @relation("SentEmails", fields: [userId], references: [id])
+
+  @@index([folder])
+}
+
+model Integration {
+  id          String            @id @default(uuid())
+  name        String
+  channel     Channel           @unique
+  description String?
+  status      IntegrationStatus @default(disconnected)
+  apiKey      String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model BusinessInfo {
+  id          String  @id @default("1")
+  companyName String
+  address     String?
+  phone       String?
+  email       String?
+}
+
+model ServiceStatus {
+  id          String            @id @default(uuid())
+  name        String            @unique
+  status      ServiceStatusType @default(operational)
+  lastChecked DateTime          @default(now())
+}
+
+model UpdateLog {
+  id          String   @id @default(uuid())
+  version     String
+  date        DateTime
+  description String
+  createdAt   DateTime @default(now())
+
+  changes UpdateLogChange[]
+}
+
+model UpdateLogChange {
+  id          String    @id @default(uuid())
+  change      String
+  updateLogId String
+  updateLog   UpdateLog @relation(fields: [updateLogId], references: [id], onDelete: Cascade)
+}
+
+model SupportMessage {
+  id        String               @id @default(uuid())
+  text      String               @db.Text
+  sender    SupportMessageSender
+  timestamp DateTime             @default(now())
+  userId    String?
+  user      User?                @relation(fields: [userId], references: [id])
+}
+
+model FaqItem {
+  id       String @id @default(uuid())
+  question String
+  answer   String @db.Text
+  order    Int    @default(0)
+}

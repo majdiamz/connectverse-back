@@ -1,0 +1,852 @@
+openapi: 3.0.0
+info:
+  title: ConnectVerse API
+  description: API for ConnectVerse, a unified messaging platform for modern teams.
+  version: 1.0.0
+servers:
+  - url: /api
+    description: Local API server
+
+paths:
+  /dashboard/stats:
+    get:
+      summary: Get Dashboard Stats
+      description: Retrieves key statistics for the main dashboard.
+      tags: [Dashboard]
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStats'
+  
+  /dashboard/conversation-trends:
+    get:
+      summary: Get Conversation Trends
+      description: Retrieves data for new vs. resolved conversations over time.
+      tags: [Dashboard]
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConversationTrendPoint'
+
+  /dashboard/deals-by-stage:
+    get:
+      summary: Get Deals by Stage
+      description: Retrieves the total value of deals in each funnel stage.
+      tags: [Dashboard]
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DealStageValue'
+  
+  /dashboard/platform-stats:
+    get:
+      summary: Get Platform Stats
+      description: Retrieves performance metrics for each connected channel.
+      tags: [Dashboard]
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlatformStats'
+
+  /customers:
+    get:
+      summary: List Customers
+      description: Get a list of customers with filtering and pagination.
+      tags: [Customers]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: source
+          in: query
+          schema:
+            $ref: '#/components/schemas/Channel'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/CustomerStatus'
+        - name: tag
+          in: query
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: A list of customers.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  customers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Customer'
+                  totalPages:
+                    type: integer
+                  currentPage:
+                    type: integer
+
+    post:
+      summary: Create Customer
+      description: Add a new customer to the system.
+      tags: [Customers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewCustomer'
+      responses:
+        '201':
+          description: Customer created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+
+  /customers/{customerId}:
+    get:
+      summary: Get Customer by ID
+      description: Retrieve details for a specific customer.
+      tags: [Customers]
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Customer details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '404':
+          description: Customer not found.
+    put:
+      summary: Update Customer
+      description: Update an existing customer's details.
+      tags: [Customers]
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewCustomer' # Can be same as create
+      responses:
+        '200':
+          description: Customer updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '404':
+          description: Customer not found.
+
+  /customers/{customerId}/status:
+    put:
+      summary: Update Customer Status
+      description: Update the funnel stage for a customer.
+      tags: [Customers]
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  $ref: '#/components/schemas/CustomerStatus'
+      responses:
+        '200':
+          description: Status updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+
+  /customers/{customerId}/deals:
+    post:
+      summary: Create Deal
+      description: Create a new deal for a customer.
+      tags: [Customers, Deals]
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewDeal'
+      responses:
+        '201':
+          description: Deal created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deal'
+
+  /conversations:
+    get:
+      summary: List Conversations
+      description: Get a list of conversations with filtering and pagination.
+      tags: [Conversations]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: channel
+          in: query
+          schema:
+            $ref: '#/components/schemas/Channel'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [read, unread]
+      responses:
+        '200':
+          description: A list of conversations.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Conversation'
+                  totalPages:
+                    type: integer
+                  currentPage:
+                    type: integer
+
+  /conversations/{conversationId}:
+    get:
+      summary: Get Conversation Details
+      description: Retrieve a specific conversation and its messages.
+      tags: [Conversations]
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Conversation details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+
+  /conversations/{conversationId}/messages:
+    post:
+      summary: Send Message
+      description: Send a message in a conversation.
+      tags: [Conversations]
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+      responses:
+        '201':
+          description: Message sent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+
+  /conversations/{conversationId}/read:
+    put:
+      summary: Mark as Read
+      description: Mark a conversation as read.
+      tags: [Conversations]
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Conversation marked as read.
+
+  /emails:
+    get:
+      summary: List Emails
+      description: Get emails from a specific folder.
+      tags: [Emails]
+      parameters:
+        - name: folder
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/EmailFolder'
+      responses:
+        '200':
+          description: A list of emails.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Email'
+    post:
+      summary: Send Email
+      description: Compose and send a new email.
+      tags: [Emails]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewEmail'
+      responses:
+        '201':
+          description: Email sent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Email'
+
+  /emails/{emailId}:
+    put:
+      summary: Update Email
+      description: Update an email's properties (e.g., mark as read).
+      tags: [Emails]
+      parameters:
+        - name: emailId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                isRead:
+                  type: boolean
+      responses:
+        '200':
+          description: Email updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Email'
+
+  /integrations:
+    get:
+      summary: List Integrations
+      description: Get the status of all available integrations.
+      tags: [Integrations]
+      responses:
+        '200':
+          description: List of integrations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Integration'
+
+  /integrations/{channel}/connect:
+    post:
+      summary: Connect Integration
+      description: Connect a channel with its API key.
+      tags: [Integrations]
+      parameters:
+        - name: channel
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Channel'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                apiKey:
+                  type: string
+      responses:
+        '200':
+          description: Integration connected.
+
+  /settings/business-info:
+    get:
+      summary: Get Business Info
+      tags: [Settings]
+      responses:
+        '200':
+          description: Business information.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessInfo'
+    put:
+      summary: Update Business Info
+      tags: [Settings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusinessInfo'
+      responses:
+        '200':
+          description: Business info updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessInfo'
+
+  /status/services:
+    get:
+      summary: Get Service Status
+      tags: [Status]
+      responses:
+        '200':
+          description: A list of services and their statuses.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServiceStatus'
+  
+  /status/update-logs:
+    get:
+      summary: Get Update Logs
+      tags: [Status]
+      responses:
+        '200':
+          description: A list of recent application updates.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UpdateLog'
+
+  /support/messages:
+    get:
+      summary: Get Support Messages
+      tags: [Support]
+      responses:
+        '200':
+          description: Chat history with support.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SupportMessage'
+    post:
+      summary: Send Support Message
+      tags: [Support]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+      responses:
+        '201':
+          description: Message sent to support.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportMessage'
+  
+  /faq:
+    get:
+      summary: Get FAQs
+      tags: [FAQ]
+      responses:
+        '200':
+          description: List of frequently asked questions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FaqItem'
+
+components:
+  schemas:
+    Channel:
+      type: string
+      enum: [whatsapp, messenger, instagram, tiktok]
+
+    CustomerStatus:
+      type: string
+      enum: [new, contacted, qualified, unqualified, demo, won]
+      
+    DealStatus:
+      type: string
+      enum: ['Won', 'Lost', 'In Progress']
+
+    Customer:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+        joined:
+          type: string
+          format: date
+        tags:
+          type: array
+          items:
+            type: string
+        channel:
+          $ref: '#/components/schemas/Channel'
+        status:
+          $ref: '#/components/schemas/CustomerStatus'
+        dealName:
+          type: string
+        dealHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/Deal'
+
+    NewCustomer:
+      type: object
+      required: [name, email, channel, status]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        channel:
+          $ref: '#/components/schemas/Channel'
+        status:
+          $ref: '#/components/schemas/CustomerStatus'
+
+    Deal:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/DealStatus'
+        amount:
+          type: number
+        closeDate:
+          type: string
+          format: date
+
+    NewDeal:
+      type: object
+      required: [name, amount]
+      properties:
+        name:
+          type: string
+        amount:
+          type: number
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+        text:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        sender:
+          type: string
+          enum: [user, customer]
+    
+    Conversation:
+      type: object
+      properties:
+        id:
+          type: string
+        customer:
+          $ref: '#/components/schemas/Customer'
+        channel:
+          $ref: '#/components/schemas/Channel'
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+        unreadCount:
+          type: integer
+    
+    EmailFolder:
+      type: string
+      enum: [inbox, sent, drafts, trash]
+
+    Email:
+      type: object
+      properties:
+        id:
+          type: string
+        from:
+          type: object
+          properties:
+            name:
+              type: string
+            email:
+              type: string
+              format: email
+            avatar:
+              type: string
+              format: uri
+        subject:
+          type: string
+        body:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        isRead:
+          type: boolean
+        folder:
+          $ref: '#/components/schemas/EmailFolder'
+    
+    NewEmail:
+      type: object
+      required: [subject, body]
+      properties:
+        subject:
+          type: string
+        body:
+          type: string
+
+    DashboardStats:
+      type: object
+      properties:
+        totalConversations:
+          type: integer
+        newLeads:
+          type: integer
+        responseRate:
+          type: number
+        openConversations:
+          type: integer
+          
+    ConversationTrendPoint:
+      type: object
+      properties:
+        month:
+          type: string
+        new:
+          type: integer
+        resolved:
+          type: integer
+
+    DealStageValue:
+      type: object
+      properties:
+        stage:
+          type: string
+        amount:
+          type: number
+
+    PlatformStats:
+      type: object
+      properties:
+        platform:
+          $ref: '#/components/schemas/Channel'
+        totalConversations:
+          type: integer
+        newLeads:
+          type: integer
+        responseRate:
+          type: number
+        conversionRate:
+          type: number
+          
+    Integration:
+      type: object
+      properties:
+        name:
+          type: string
+        channel:
+          $ref: '#/components/schemas/Channel'
+        description:
+          type: string
+        status:
+          type: string
+          enum: [connected, disconnected]
+
+    BusinessInfo:
+      type: object
+      properties:
+        companyName:
+          type: string
+        address:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+          
+    ServiceStatus:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [operational, degraded, outage]
+        lastChecked:
+          type: string
+          
+    UpdateLog:
+      type: object
+      properties:
+        version:
+          type: string
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+        changes:
+          type: array
+          items:
+            type: string
+
+    SupportMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        text:
+          type: string
+        sender:
+          type: string
+          enum: [user, support]
+        timestamp:
+          type: string
+          
+    FaqItem:
+      type: object
+      properties:
+        question:
+          type: string
+        answer:
+          type: string
+
+tags:
+  - name: Dashboard
+    description: APIs for dashboard widgets.
+  - name: Customers
+    description: Manage customer data.
+  - name: Deals
+    description: Manage sales deals.
+  - name: Conversations
+    description: APIs for the unified inbox.
+  - name: Emails
+    description: APIs for the email client.
+  - name: Integrations
+    description: Manage channel integrations.
+  - name: Settings
+    description: Application settings.
+  - name: Status
+    description: API for system status and update logs.
+  - name: Support
+    description: API for the support chat.
+  - name: FAQ
+    description: API for FAQ content.
