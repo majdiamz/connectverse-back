@@ -3,6 +3,7 @@ import { body, query, param, validationResult } from 'express-validator';
 import { prisma } from '../index.js';
 import { authenticateToken, AuthRequest } from '../middleware/auth.js';
 import { Prisma } from '@prisma/client';
+import { sendMessage as sendFacebookMessage } from '../services/facebook.js';
 
 const router = Router();
 
@@ -202,6 +203,9 @@ router.post(
     try {
       const conversation = await prisma.conversation.findUnique({
         where: { id: conversationId },
+        include: {
+          customer: true,
+        },
       });
 
       if (!conversation) {
@@ -209,10 +213,38 @@ router.post(
         return;
       }
 
+      let externalMessageId: string | null = null;
+
+      // If this is a messenger conversation, send via Facebook Graph API
+      if (conversation.channel === 'messenger' && conversation.customer.externalId) {
+        const integration = await prisma.integration.findUnique({
+          where: { channel: 'messenger' },
+        });
+
+        if (integration?.status === 'connected' && integration.apiKey) {
+          try {
+            const fbResponse = await sendFacebookMessage(
+              conversation.customer.externalId,
+              req.body.text,
+              integration.apiKey
+            );
+            externalMessageId = fbResponse.message_id;
+            console.log(`Sent message to Facebook: ${externalMessageId}`);
+          } catch (fbError) {
+            console.error('Failed to send message via Facebook:', fbError);
+            res.status(502).json({ error: 'Failed to send message to Facebook Messenger' });
+            return;
+          }
+        } else {
+          console.warn('Messenger integration not connected, message will not be delivered');
+        }
+      }
+
       const message = await prisma.message.create({
         data: {
           text: req.body.text,
           sender: 'user',
+          externalMessageId,
           conversationId,
           userId: req.user!.id,
         },
@@ -229,6 +261,7 @@ router.post(
         text: message.text,
         timestamp: message.timestamp.toISOString(),
         sender: message.sender,
+        externalMessageId: message.externalMessageId,
       });
     } catch (error) {
       console.error('Send message error:', error);

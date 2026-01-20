@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { body, param, validationResult } from 'express-validator';
 import { prisma } from '../index.js';
 import { authenticateToken, AuthRequest } from '../middleware/auth.js';
+import { validatePageAccessToken } from '../services/facebook.js';
 
 const router = Router();
 
@@ -45,10 +46,26 @@ router.post(
     const { apiKey } = req.body;
 
     try {
+      let pageId: string | null = null;
+
+      // For messenger, validate the Page Access Token and get Page ID
+      if (channel === 'messenger') {
+        try {
+          const pageInfo = await validatePageAccessToken(apiKey);
+          pageId = pageInfo.id;
+          console.log(`Validated Page Access Token for page: ${pageInfo.name} (${pageId})`);
+        } catch (tokenError) {
+          console.error('Page Access Token validation failed:', tokenError);
+          res.status(400).json({ error: 'Invalid Page Access Token' });
+          return;
+        }
+      }
+
       const integration = await prisma.integration.upsert({
         where: { channel: channel as any },
         update: {
           apiKey,
+          pageId,
           status: 'connected',
         },
         create: {
@@ -56,6 +73,7 @@ router.post(
           channel: channel as any,
           description: getIntegrationDescription(channel),
           apiKey,
+          pageId,
           status: 'connected',
         },
       });
@@ -65,6 +83,7 @@ router.post(
         channel: integration.channel,
         description: integration.description,
         status: integration.status,
+        pageId: integration.pageId,
       });
     } catch (error) {
       console.error('Connect integration error:', error);
@@ -93,6 +112,8 @@ router.post(
         data: {
           status: 'disconnected',
           apiKey: null,
+          pageId: null,
+          webhookVerified: false,
         },
       });
 

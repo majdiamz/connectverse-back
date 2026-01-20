@@ -74,21 +74,24 @@ model User {
 }
 
 model Customer {
-  id        String         @id @default(uuid())
-  name      String
-  email     String         @unique
-  phone     String?
-  avatarUrl String?
-  joined    DateTime       @default(now())
-  channel   Channel
-  status    CustomerStatus @default(new)
-  dealName  String?
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id         String         @id @default(uuid())
+  name       String
+  email      String         @unique
+  phone      String?
+  avatarUrl  String?
+  externalId String?        // Facebook PSID or other platform-specific user ID
+  joined     DateTime       @default(now())
+  channel    Channel
+  status     CustomerStatus @default(new)
+  dealName   String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
 
   tags          CustomerTag[]
   deals         Deal[]
   conversations Conversation[]
+
+  @@index([externalId, channel])
 }
 
 model CustomerTag {
@@ -125,16 +128,18 @@ model Conversation {
 }
 
 model Message {
-  id             String        @id @default(uuid())
-  text           String        @db.Text
-  sender         MessageSender
-  timestamp      DateTime      @default(now())
-  conversationId String
-  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  userId         String?
-  user           User?         @relation(fields: [userId], references: [id])
+  id                String        @id @default(uuid())
+  text              String        @db.Text
+  sender            MessageSender
+  timestamp         DateTime      @default(now())
+  externalMessageId String?       // Facebook message ID for deduplication
+  conversationId    String
+  conversation      Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId            String?
+  user              User?         @relation(fields: [userId], references: [id])
 
   @@index([conversationId])
+  @@index([externalMessageId])
 }
 
 model Email {
@@ -154,14 +159,16 @@ model Email {
 }
 
 model Integration {
-  id          String            @id @default(uuid())
-  name        String
-  channel     Channel           @unique
-  description String?
-  status      IntegrationStatus @default(disconnected)
-  apiKey      String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id              String            @id @default(uuid())
+  name            String
+  channel         Channel           @unique
+  description     String?
+  status          IntegrationStatus @default(disconnected)
+  apiKey          String?           // Page Access Token for Facebook
+  pageId          String?           // Facebook Page ID
+  webhookVerified Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 }
 
 model BusinessInfo {

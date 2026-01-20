@@ -18,6 +18,10 @@ import settingsRoutes from './routes/settings.js';
 import statusRoutes from './routes/status.js';
 import supportRoutes from './routes/support.js';
 import faqRoutes from './routes/faq.js';
+import messengerWebhookRoutes from './routes/webhooks/messenger.js';
+
+// Import middleware
+import { preserveRawBody } from './middleware/facebookWebhook.js';
 
 // Initialize Prisma client
 export const prisma = new PrismaClient();
@@ -25,12 +29,17 @@ export const prisma = new PrismaClient();
 // Create Express app
 const app = express();
 
-// Middleware
+// CORS configuration - allow all origins
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:9002',
+  origin: true,
   credentials: true,
 }));
 app.use(cookieParser());
+
+// Webhook routes need raw body for signature validation - must be before express.json()
+app.use('/webhooks/messenger', express.json({ verify: preserveRawBody }), messengerWebhookRoutes);
+
+// JSON parsing for all other routes
 app.use(express.json());
 
 // Health check endpoint
