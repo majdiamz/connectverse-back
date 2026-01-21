@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
@@ -32,6 +33,9 @@ export const prisma = new PrismaClient();
 
 // Create Express app
 const app = express();
+
+// Enable gzip compression for all responses
+app.use(compression());
 
 // CORS configuration - allow all origins
 app.use(cors({
