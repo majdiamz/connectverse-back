@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
+import { execSync } from 'child_process';
 import { PrismaClient } from '@prisma/client';
 
 // Load environment variables
@@ -22,6 +23,9 @@ import messengerWebhookRoutes from './routes/webhooks/messenger.js';
 
 // Import middleware
 import { preserveRawBody } from './middleware/facebookWebhook.js';
+
+// Import seed function
+import { seedDatabase } from './seed.js';
 
 // Initialize Prisma client
 export const prisma = new PrismaClient();
@@ -78,8 +82,21 @@ const PORT = process.env.PORT || 3001;
 
 async function main() {
   try {
+    // Auto-setup database if AUTO_SEED environment variable is set
+    if (process.env.AUTO_SEED === 'true') {
+      console.log('AUTO_SEED enabled, pushing database schema...');
+      execSync('npx prisma db push --skip-generate', { stdio: 'inherit' });
+      console.log('Database schema pushed successfully');
+    }
+
     await prisma.$connect();
     console.log('Connected to database');
+
+    // Seed database after schema is ready
+    if (process.env.AUTO_SEED === 'true') {
+      console.log('Seeding database...');
+      await seedDatabase(prisma);
+    }
 
     app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
