@@ -9,14 +9,14 @@ const router = Router();
 router.get('/business-info', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     let businessInfo = await prisma.businessInfo.findUnique({
-      where: { id: '1' },
+      where: { customerId: req.user!.customerId },
     });
 
     // Create default if doesn't exist
     if (!businessInfo) {
       businessInfo = await prisma.businessInfo.create({
         data: {
-          id: '1',
+          customerId: req.user!.customerId,
           companyName: 'ConnectVerse Inc.',
           address: '123 Main Street, Anytown, USA 12345',
           phone: '+1 (555) 123-4567',
@@ -58,7 +58,7 @@ router.put(
 
     try {
       const businessInfo = await prisma.businessInfo.upsert({
-        where: { id: '1' },
+        where: { customerId: req.user!.customerId },
         update: {
           ...(companyName && { companyName }),
           ...(address !== undefined && { address }),
@@ -66,7 +66,7 @@ router.put(
           ...(email && { email }),
         },
         create: {
-          id: '1',
+          customerId: req.user!.customerId,
           companyName: companyName || 'ConnectVerse Inc.',
           address: address || null,
           phone: phone || null,

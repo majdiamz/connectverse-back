@@ -7,15 +7,21 @@ const router = Router();
 // Get Dashboard Stats
 router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const customerId = req.user!.customerId;
+
     const [totalConversations, newLeadsCount, openConversations] = await Promise.all([
-      prisma.conversation.count(),
-      prisma.customer.count({ where: { status: 'new' } }),
-      prisma.conversation.count({ where: { unreadCount: { gt: 0 } } }),
+      prisma.conversation.count({ where: { customerId } }),
+      prisma.contact.count({ where: { customerId, status: 'new' } }),
+      prisma.conversation.count({ where: { customerId, unreadCount: { gt: 0 } } }),
     ]);
 
     // Calculate response rate (mock calculation based on messages)
-    const totalMessages = await prisma.message.count();
-    const userMessages = await prisma.message.count({ where: { sender: 'user' } });
+    const totalMessages = await prisma.message.count({
+      where: { conversation: { customerId } },
+    });
+    const userMessages = await prisma.message.count({
+      where: { conversation: { customerId }, sender: 'user' },
+    });
     const responseRate = totalMessages > 0 ? Math.round((userMessages / totalMessages) * 100) : 0;
 
     res.json({
@@ -33,12 +39,15 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response):
 // Get Conversation Trends
 router.get('/conversation-trends', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const customerId = req.user!.customerId;
+
     // Get conversation data grouped by month for the last 6 months
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
     const conversations = await prisma.conversation.findMany({
       where: {
+        customerId,
         createdAt: { gte: sixMonthsAgo },
       },
       select: {
@@ -85,8 +94,13 @@ router.get('/conversation-trends', authenticateToken, async (req: AuthRequest, r
 // Get Deals by Stage
 router.get('/deals-by-stage', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const customerId = req.user!.customerId;
+
     const deals = await prisma.deal.groupBy({
       by: ['status'],
+      where: {
+        contact: { customerId },
+      },
       _sum: {
         amount: true,
       },
@@ -107,21 +121,22 @@ router.get('/deals-by-stage', authenticateToken, async (req: AuthRequest, res: R
 // Get Platform Stats
 router.get('/platform-stats', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const customerId = req.user!.customerId;
     const channels: ('whatsapp' | 'messenger' | 'instagram' | 'tiktok')[] = ['whatsapp', 'messenger', 'instagram', 'tiktok'];
 
     const stats = await Promise.all(
       channels.map(async (channel) => {
         const totalConversations = await prisma.conversation.count({
-          where: { channel },
+          where: { customerId, channel },
         });
-        const newLeads = await prisma.customer.count({
-          where: { channel, status: 'new' },
+        const newLeads = await prisma.contact.count({
+          where: { customerId, channel, status: 'new' },
         });
-        const wonCustomers = await prisma.customer.count({
-          where: { channel, status: 'won' },
+        const wonContacts = await prisma.contact.count({
+          where: { customerId, channel, status: 'won' },
         });
-        const totalCustomers = await prisma.customer.count({
-          where: { channel },
+        const totalContacts = await prisma.contact.count({
+          where: { customerId, channel },
         });
 
         return {
@@ -129,7 +144,7 @@ router.get('/platform-stats', authenticateToken, async (req: AuthRequest, res: R
           totalConversations,
           newLeads,
           responseRate: Math.floor(Math.random() * 20) + 80, // Mock: 80-100%
-          conversionRate: totalCustomers > 0 ? Math.round((wonCustomers / totalCustomers) * 100) : 0,
+          conversionRate: totalContacts > 0 ? Math.round((wonContacts / totalContacts) * 100) : 0,
         };
       })
     );

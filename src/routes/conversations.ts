@@ -30,13 +30,15 @@ router.get(
     const { search, channel, status } = req.query;
 
     try {
-      const where: Prisma.ConversationWhereInput = {};
+      const where: Prisma.ConversationWhereInput = {
+        customerId: req.user!.customerId,
+      };
 
       if (channel) where.channel = channel as any;
       if (status === 'read') where.unreadCount = 0;
       if (status === 'unread') where.unreadCount = { gt: 0 };
       if (search) {
-        where.customer = {
+        where.contact = {
           OR: [
             { name: { contains: search as string } },
             { email: { contains: search as string } },
@@ -50,7 +52,7 @@ router.get(
           skip: (page - 1) * limit,
           take: limit,
           include: {
-            customer: {
+            contact: {
               include: {
                 tags: true,
                 deals: true,
@@ -70,17 +72,17 @@ router.get(
         channel: conv.channel,
         unreadCount: conv.unreadCount,
         customer: {
-          id: conv.customer.id,
-          name: conv.customer.name,
-          email: conv.customer.email,
-          phone: conv.customer.phone,
-          avatarUrl: conv.customer.avatarUrl,
-          joined: conv.customer.joined.toISOString().split('T')[0],
-          tags: conv.customer.tags.map((t) => t.name),
-          channel: conv.customer.channel,
-          status: conv.customer.status,
-          dealName: conv.customer.dealName,
-          dealHistory: conv.customer.deals.map((d) => ({
+          id: conv.contact.id,
+          name: conv.contact.name,
+          email: conv.contact.email,
+          phone: conv.contact.phone,
+          avatarUrl: conv.contact.avatarUrl,
+          joined: conv.contact.joined.toISOString().split('T')[0],
+          tags: conv.contact.tags.map((t) => t.name),
+          channel: conv.contact.channel,
+          status: conv.contact.status,
+          dealName: conv.contact.dealName,
+          dealHistory: conv.contact.deals.map((d) => ({
             id: d.id,
             name: d.name,
             status: d.status === 'InProgress' ? 'In Progress' : d.status,
@@ -123,10 +125,13 @@ router.get(
     const conversationId = req.params.conversationId as string;
 
     try {
-      const conversation = await prisma.conversation.findUnique({
-        where: { id: conversationId },
+      const conversation = await prisma.conversation.findFirst({
+        where: {
+          id: conversationId,
+          customerId: req.user!.customerId,
+        },
         include: {
-          customer: {
+          contact: {
             include: {
               tags: true,
               deals: true,
@@ -143,7 +148,7 @@ router.get(
         return;
       }
 
-      const customer = conversation.customer;
+      const contact = conversation.contact;
       const messages = conversation.messages;
 
       res.json({
@@ -151,17 +156,17 @@ router.get(
         channel: conversation.channel,
         unreadCount: conversation.unreadCount,
         customer: {
-          id: customer.id,
-          name: customer.name,
-          email: customer.email,
-          phone: customer.phone,
-          avatarUrl: customer.avatarUrl,
-          joined: customer.joined.toISOString().split('T')[0],
-          tags: customer.tags.map((t: { name: string }) => t.name),
-          channel: customer.channel,
-          status: customer.status,
-          dealName: customer.dealName,
-          dealHistory: customer.deals.map((d: { id: string; name: string; status: string; amount: number; closeDate: Date | null }) => ({
+          id: contact.id,
+          name: contact.name,
+          email: contact.email,
+          phone: contact.phone,
+          avatarUrl: contact.avatarUrl,
+          joined: contact.joined.toISOString().split('T')[0],
+          tags: contact.tags.map((t: { name: string }) => t.name),
+          channel: contact.channel,
+          status: contact.status,
+          dealName: contact.dealName,
+          dealHistory: contact.deals.map((d: { id: string; name: string; status: string; amount: number; closeDate: Date | null }) => ({
             id: d.id,
             name: d.name,
             status: d.status === 'InProgress' ? 'In Progress' : d.status,
@@ -201,10 +206,13 @@ router.post(
     const conversationId = req.params.conversationId as string;
 
     try {
-      const conversation = await prisma.conversation.findUnique({
-        where: { id: conversationId },
+      const conversation = await prisma.conversation.findFirst({
+        where: {
+          id: conversationId,
+          customerId: req.user!.customerId,
+        },
         include: {
-          customer: true,
+          contact: true,
         },
       });
 
@@ -216,15 +224,18 @@ router.post(
       let externalMessageId: string | null = null;
 
       // If this is a messenger conversation, send via Facebook Graph API
-      if (conversation.channel === 'messenger' && conversation.customer.externalId) {
-        const integration = await prisma.integration.findUnique({
-          where: { channel: 'messenger' },
+      if (conversation.channel === 'messenger' && conversation.contact.externalId) {
+        const integration = await prisma.integration.findFirst({
+          where: {
+            customerId: req.user!.customerId,
+            channel: 'messenger',
+          },
         });
 
         if (integration?.status === 'connected' && integration.apiKey) {
           try {
             const fbResponse = await sendFacebookMessage(
-              conversation.customer.externalId,
+              conversation.contact.externalId,
               req.body.text,
               integration.apiKey
             );
@@ -285,6 +296,19 @@ router.put(
     const conversationId = req.params.conversationId as string;
 
     try {
+      // Verify conversation belongs to this customer
+      const conversation = await prisma.conversation.findFirst({
+        where: {
+          id: conversationId,
+          customerId: req.user!.customerId,
+        },
+      });
+
+      if (!conversation) {
+        res.status(404).json({ error: 'Conversation not found' });
+        return;
+      }
+
       await prisma.conversation.update({
         where: { id: conversationId },
         data: { unreadCount: 0 },
@@ -323,8 +347,11 @@ router.get(
     const before = req.query.before as string | undefined;
 
     try {
-      const conversation = await prisma.conversation.findUnique({
-        where: { id: conversationId },
+      const conversation = await prisma.conversation.findFirst({
+        where: {
+          id: conversationId,
+          customerId: req.user!.customerId,
+        },
       });
 
       if (!conversation) {

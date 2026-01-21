@@ -6,7 +6,7 @@ import { Prisma } from '@prisma/client';
 
 const router = Router();
 
-// List Customers
+// List Contacts
 router.get(
   '/',
   authenticateToken,
@@ -32,7 +32,9 @@ router.get(
     const { search, source, status, tag, dateFrom, dateTo } = req.query;
 
     try {
-      const where: Prisma.CustomerWhereInput = {};
+      const where: Prisma.ContactWhereInput = {
+        customerId: req.user!.customerId,
+      };
 
       if (search) {
         where.OR = [
@@ -54,8 +56,8 @@ router.get(
         if (dateTo) where.joined.lte = new Date(dateTo as string);
       }
 
-      const [customers, total] = await Promise.all([
-        prisma.customer.findMany({
+      const [contacts, total] = await Promise.all([
+        prisma.contact.findMany({
           where,
           skip: (page - 1) * limit,
           take: limit,
@@ -65,10 +67,10 @@ router.get(
           },
           orderBy: { createdAt: 'desc' },
         }),
-        prisma.customer.count({ where }),
+        prisma.contact.count({ where }),
       ]);
 
-      const formattedCustomers = customers.map((c) => ({
+      const formattedContacts = contacts.map((c) => ({
         id: c.id,
         name: c.name,
         email: c.email,
@@ -89,18 +91,18 @@ router.get(
       }));
 
       res.json({
-        customers: formattedCustomers,
+        customers: formattedContacts,
         totalPages: Math.ceil(total / limit),
         currentPage: page,
       });
     } catch (error) {
-      console.error('List customers error:', error);
-      res.status(500).json({ error: 'Failed to list customers' });
+      console.error('List contacts error:', error);
+      res.status(500).json({ error: 'Failed to list contacts' });
     }
   }
 );
 
-// Create Customer
+// Create Contact
 router.post(
   '/',
   authenticateToken,
@@ -121,7 +123,7 @@ router.post(
     const { name, email, phone, channel, status } = req.body;
 
     try {
-      const customer = await prisma.customer.create({
+      const contact = await prisma.contact.create({
         data: {
           name,
           email,
@@ -129,6 +131,7 @@ router.post(
           channel,
           status,
           avatarUrl: `https://picsum.photos/seed/${Date.now()}/100/100`,
+          customerId: req.user!.customerId,
         },
         include: {
           tags: true,
@@ -136,25 +139,26 @@ router.post(
         },
       });
 
-      // Create a conversation for the new customer
+      // Create a conversation for the new contact
       await prisma.conversation.create({
         data: {
-          channel: customer.channel,
-          customerId: customer.id,
+          channel: contact.channel,
+          contactId: contact.id,
+          customerId: req.user!.customerId,
         },
       });
 
       res.status(201).json({
-        id: customer.id,
-        name: customer.name,
-        email: customer.email,
-        phone: customer.phone,
-        avatarUrl: customer.avatarUrl,
-        joined: customer.joined.toISOString().split('T')[0],
-        tags: customer.tags.map((t) => t.name),
-        channel: customer.channel,
-        status: customer.status,
-        dealName: customer.dealName,
+        id: contact.id,
+        name: contact.name,
+        email: contact.email,
+        phone: contact.phone,
+        avatarUrl: contact.avatarUrl,
+        joined: contact.joined.toISOString().split('T')[0],
+        tags: contact.tags.map((t) => t.name),
+        channel: contact.channel,
+        status: contact.status,
+        dealName: contact.dealName,
         dealHistory: [],
       });
     } catch (error: any) {
@@ -162,8 +166,8 @@ router.post(
         res.status(400).json({ error: 'Email already exists' });
         return;
       }
-      console.error('Create customer error:', error);
-      res.status(500).json({ error: 'Failed to create customer' });
+      console.error('Create contact error:', error);
+      res.status(500).json({ error: 'Failed to create contact' });
     }
   }
 );
@@ -180,34 +184,37 @@ router.get(
       return;
     }
 
-    const customerId = req.params.customerId as string;
+    const contactId = req.params.customerId as string;
 
     try {
-      const customer = await prisma.customer.findUnique({
-        where: { id: customerId },
+      const contact = await prisma.contact.findFirst({
+        where: {
+          id: contactId,
+          customerId: req.user!.customerId,
+        },
         include: {
           tags: true,
           deals: true,
         },
       });
 
-      if (!customer) {
-        res.status(404).json({ error: 'Customer not found' });
+      if (!contact) {
+        res.status(404).json({ error: 'Contact not found' });
         return;
       }
 
       res.json({
-        id: customer.id,
-        name: customer.name,
-        email: customer.email,
-        phone: customer.phone,
-        avatarUrl: customer.avatarUrl,
-        joined: customer.joined.toISOString().split('T')[0],
-        tags: customer.tags.map((t: { name: string }) => t.name),
-        channel: customer.channel,
-        status: customer.status,
-        dealName: customer.dealName,
-        dealHistory: customer.deals.map((d: { id: string; name: string; status: string; amount: number; closeDate: Date | null }) => ({
+        id: contact.id,
+        name: contact.name,
+        email: contact.email,
+        phone: contact.phone,
+        avatarUrl: contact.avatarUrl,
+        joined: contact.joined.toISOString().split('T')[0],
+        tags: contact.tags.map((t: { name: string }) => t.name),
+        channel: contact.channel,
+        status: contact.status,
+        dealName: contact.dealName,
+        dealHistory: contact.deals.map((d: { id: string; name: string; status: string; amount: number; closeDate: Date | null }) => ({
           id: d.id,
           name: d.name,
           status: d.status === 'InProgress' ? 'In Progress' : d.status,
@@ -216,8 +223,8 @@ router.get(
         })),
       });
     } catch (error) {
-      console.error('Get customer error:', error);
-      res.status(500).json({ error: 'Failed to get customer' });
+      console.error('Get contact error:', error);
+      res.status(500).json({ error: 'Failed to get contact' });
     }
   }
 );
@@ -241,12 +248,22 @@ router.put(
       return;
     }
 
-    const customerId = req.params.customerId as string;
+    const contactId = req.params.customerId as string;
     const { name, email, phone, channel, status } = req.body;
 
     try {
-      const customer = await prisma.customer.update({
-        where: { id: customerId },
+      // First verify the contact belongs to this customer
+      const existingContact = await prisma.contact.findFirst({
+        where: { id: contactId, customerId: req.user!.customerId },
+      });
+
+      if (!existingContact) {
+        res.status(404).json({ error: 'Contact not found' });
+        return;
+      }
+
+      const contact = await prisma.contact.update({
+        where: { id: contactId },
         data: {
           ...(name && { name }),
           ...(email && { email }),
@@ -261,17 +278,17 @@ router.put(
       });
 
       res.json({
-        id: customer.id,
-        name: customer.name,
-        email: customer.email,
-        phone: customer.phone,
-        avatarUrl: customer.avatarUrl,
-        joined: customer.joined.toISOString().split('T')[0],
-        tags: customer.tags.map((t: { name: string }) => t.name),
-        channel: customer.channel,
-        status: customer.status,
-        dealName: customer.dealName,
-        dealHistory: customer.deals.map((d: { id: string; name: string; status: string; amount: number; closeDate: Date | null }) => ({
+        id: contact.id,
+        name: contact.name,
+        email: contact.email,
+        phone: contact.phone,
+        avatarUrl: contact.avatarUrl,
+        joined: contact.joined.toISOString().split('T')[0],
+        tags: contact.tags.map((t: { name: string }) => t.name),
+        channel: contact.channel,
+        status: contact.status,
+        dealName: contact.dealName,
+        dealHistory: contact.deals.map((d: { id: string; name: string; status: string; amount: number; closeDate: Date | null }) => ({
           id: d.id,
           name: d.name,
           status: d.status === 'InProgress' ? 'In Progress' : d.status,
@@ -281,11 +298,11 @@ router.put(
       });
     } catch (error: unknown) {
       if ((error as { code?: string }).code === 'P2025') {
-        res.status(404).json({ error: 'Customer not found' });
+        res.status(404).json({ error: 'Contact not found' });
         return;
       }
-      console.error('Update customer error:', error);
-      res.status(500).json({ error: 'Failed to update customer' });
+      console.error('Update contact error:', error);
+      res.status(500).json({ error: 'Failed to update contact' });
     }
   }
 );
@@ -305,11 +322,21 @@ router.put(
       return;
     }
 
-    const customerId = req.params.customerId as string;
+    const contactId = req.params.customerId as string;
 
     try {
-      const customer = await prisma.customer.update({
-        where: { id: customerId },
+      // First verify the contact belongs to this customer
+      const existingContact = await prisma.contact.findFirst({
+        where: { id: contactId, customerId: req.user!.customerId },
+      });
+
+      if (!existingContact) {
+        res.status(404).json({ error: 'Contact not found' });
+        return;
+      }
+
+      const contact = await prisma.contact.update({
+        where: { id: contactId },
         data: { status: req.body.status },
         include: {
           tags: true,
@@ -318,17 +345,17 @@ router.put(
       });
 
       res.json({
-        id: customer.id,
-        name: customer.name,
-        email: customer.email,
-        phone: customer.phone,
-        avatarUrl: customer.avatarUrl,
-        joined: customer.joined.toISOString().split('T')[0],
-        tags: customer.tags.map((t: { name: string }) => t.name),
-        channel: customer.channel,
-        status: customer.status,
-        dealName: customer.dealName,
-        dealHistory: customer.deals.map((d: { id: string; name: string; status: string; amount: number; closeDate: Date | null }) => ({
+        id: contact.id,
+        name: contact.name,
+        email: contact.email,
+        phone: contact.phone,
+        avatarUrl: contact.avatarUrl,
+        joined: contact.joined.toISOString().split('T')[0],
+        tags: contact.tags.map((t: { name: string }) => t.name),
+        channel: contact.channel,
+        status: contact.status,
+        dealName: contact.dealName,
+        dealHistory: contact.deals.map((d: { id: string; name: string; status: string; amount: number; closeDate: Date | null }) => ({
           id: d.id,
           name: d.name,
           status: d.status === 'InProgress' ? 'In Progress' : d.status,
@@ -338,11 +365,11 @@ router.put(
       });
     } catch (error: unknown) {
       if ((error as { code?: string }).code === 'P2025') {
-        res.status(404).json({ error: 'Customer not found' });
+        res.status(404).json({ error: 'Contact not found' });
         return;
       }
-      console.error('Update customer status error:', error);
-      res.status(500).json({ error: 'Failed to update customer status' });
+      console.error('Update contact status error:', error);
+      res.status(500).json({ error: 'Failed to update contact status' });
     }
   }
 );
@@ -363,17 +390,20 @@ router.post(
       return;
     }
 
-    const customerId = req.params.customerId as string;
+    const contactId = req.params.customerId as string;
     const { name, amount } = req.body;
 
     try {
-      // Check if customer exists
-      const customer = await prisma.customer.findUnique({
-        where: { id: customerId },
+      // Check if contact exists and belongs to this customer
+      const contact = await prisma.contact.findFirst({
+        where: {
+          id: contactId,
+          customerId: req.user!.customerId,
+        },
       });
 
-      if (!customer) {
-        res.status(404).json({ error: 'Customer not found' });
+      if (!contact) {
+        res.status(404).json({ error: 'Contact not found' });
         return;
       }
 
@@ -381,14 +411,14 @@ router.post(
         data: {
           name,
           amount,
-          customerId,
+          contactId,
           closeDate: new Date(),
         },
       });
 
-      // Update customer's dealName
-      await prisma.customer.update({
-        where: { id: customerId },
+      // Update contact's dealName
+      await prisma.contact.update({
+        where: { id: contactId },
         data: { dealName: name },
       });
 
@@ -406,11 +436,11 @@ router.post(
   }
 );
 
-// Bulk Export Customers to CSV
+// Bulk Export Contacts to CSV
 router.post(
   '/export',
   authenticateToken,
-  [body('customerIds').isArray({ min: 1 })],
+  [body('contactIds').isArray({ min: 1 })],
   async (req: AuthRequest, res: Response): Promise<void> => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -418,12 +448,13 @@ router.post(
       return;
     }
 
-    const { customerIds } = req.body;
+    const { contactIds } = req.body;
 
     try {
-      const customers = await prisma.customer.findMany({
+      const contacts = await prisma.contact.findMany({
         where: {
-          id: { in: customerIds },
+          id: { in: contactIds },
+          customerId: req.user!.customerId,
         },
         include: {
           tags: true,
@@ -434,7 +465,7 @@ router.post(
 
       // Generate CSV content
       const headers = ['Name', 'Email', 'Phone', 'Channel', 'Status', 'Joined', 'Tags', 'Total Deal Value'];
-      const rows = customers.map((c) => {
+      const rows = contacts.map((c) => {
         const totalDealValue = c.deals.reduce((sum, d) => sum + d.amount, 0);
         return [
           c.name,
@@ -456,16 +487,16 @@ router.post(
       ].join('\n');
 
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', 'attachment; filename=customers-export.csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=contacts-export.csv');
       res.send(csvContent);
     } catch (error) {
-      console.error('Export customers error:', error);
-      res.status(500).json({ error: 'Failed to export customers' });
+      console.error('Export contacts error:', error);
+      res.status(500).json({ error: 'Failed to export contacts' });
     }
   }
 );
 
-// Get Funnel Data (customers grouped by status with totals)
+// Get Funnel Data (contacts grouped by status with totals)
 router.get(
   '/funnel',
   authenticateToken,
@@ -485,7 +516,9 @@ router.get(
     const { source, tag, dateFrom, dateTo } = req.query;
 
     try {
-      const where: Prisma.CustomerWhereInput = {};
+      const where: Prisma.ContactWhereInput = {
+        customerId: req.user!.customerId,
+      };
 
       if (source) where.channel = source as any;
       if (tag) {
@@ -499,7 +532,7 @@ router.get(
         if (dateTo) where.joined.lte = new Date(dateTo as string);
       }
 
-      const customers = await prisma.customer.findMany({
+      const contacts = await prisma.contact.findMany({
         where,
         include: {
           tags: true,
@@ -508,19 +541,19 @@ router.get(
         orderBy: { createdAt: 'desc' },
       });
 
-      // Group customers by status
+      // Group contacts by status
       const stages = ['new', 'contacted', 'qualified', 'demo', 'won', 'unqualified'] as const;
       const funnel = stages.map((status) => {
-        const stageCustomers = customers.filter((c) => c.status === status);
-        const totalValue = stageCustomers.reduce((sum, c) => {
+        const stageContacts = contacts.filter((c) => c.status === status);
+        const totalValue = stageContacts.reduce((sum, c) => {
           return sum + c.deals.reduce((dealSum, d) => dealSum + d.amount, 0);
         }, 0);
 
         return {
           status,
-          count: stageCustomers.length,
+          count: stageContacts.length,
           totalValue,
-          customers: stageCustomers.map((c) => ({
+          contacts: stageContacts.map((c) => ({
             id: c.id,
             name: c.name,
             email: c.email,

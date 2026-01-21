@@ -10,6 +10,7 @@ const router = Router();
 router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const integrations = await prisma.integration.findMany({
+      where: { customerId: req.user!.customerId },
       orderBy: { name: 'asc' },
     });
 
@@ -62,7 +63,12 @@ router.post(
       }
 
       const integration = await prisma.integration.upsert({
-        where: { channel: channel as any },
+        where: {
+          customerId_channel: {
+            customerId: req.user!.customerId,
+            channel: channel as any,
+          },
+        },
         update: {
           apiKey,
           pageId,
@@ -75,6 +81,7 @@ router.post(
           apiKey,
           pageId,
           status: 'connected',
+          customerId: req.user!.customerId,
         },
       });
 
@@ -108,7 +115,12 @@ router.post(
 
     try {
       const integration = await prisma.integration.update({
-        where: { channel: channel as any },
+        where: {
+          customerId_channel: {
+            customerId: req.user!.customerId,
+            channel: channel as any,
+          },
+        },
         data: {
           status: 'disconnected',
           apiKey: null,

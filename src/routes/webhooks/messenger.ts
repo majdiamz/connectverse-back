@@ -96,7 +96,7 @@ router.post(
 
       // Process each messaging event
       for (const event of entry.messaging) {
-        await processMessagingEvent(event, integration.apiKey!);
+        await processMessagingEvent(event, integration.apiKey!, integration.customerId);
       }
     }
   }
@@ -107,7 +107,8 @@ router.post(
  */
 async function processMessagingEvent(
   event: MessagingEvent,
-  pageAccessToken: string
+  pageAccessToken: string,
+  customerId: string
 ): Promise<void> {
   const senderId = event.sender.id;
   const message = event.message;
@@ -128,15 +129,16 @@ async function processMessagingEvent(
   }
 
   try {
-    // Find or create customer by PSID
-    let customer = await prisma.customer.findFirst({
+    // Find or create contact by PSID for this customer
+    let contact = await prisma.contact.findFirst({
       where: {
         externalId: senderId,
         channel: 'messenger',
+        customerId,
       },
     });
 
-    if (!customer) {
+    if (!contact) {
       // Fetch user profile from Facebook
       let userProfile = { name: 'Facebook User', profile_pic: undefined as string | undefined };
       try {
@@ -149,8 +151,8 @@ async function processMessagingEvent(
         console.warn(`Failed to fetch user profile for ${senderId}:`, profileError);
       }
 
-      // Create new customer
-      customer = await prisma.customer.create({
+      // Create new contact
+      contact = await prisma.contact.create({
         data: {
           name: userProfile.name,
           email: `messenger_${senderId}@facebook.placeholder`,
@@ -158,35 +160,38 @@ async function processMessagingEvent(
           channel: 'messenger',
           avatarUrl: userProfile.profile_pic,
           status: 'new',
+          customerId,
         },
       });
-      console.log(`Created new customer for PSID ${senderId}: ${customer.id}`);
+      console.log(`Created new contact for PSID ${senderId}: ${contact.id}`);
     }
 
     // Find or create conversation
     let conversation = await prisma.conversation.findFirst({
       where: {
-        customerId: customer.id,
+        contactId: contact.id,
         channel: 'messenger',
+        customerId,
       },
     });
 
     if (!conversation) {
       conversation = await prisma.conversation.create({
         data: {
-          customerId: customer.id,
+          contactId: contact.id,
           channel: 'messenger',
           unreadCount: 0,
+          customerId,
         },
       });
-      console.log(`Created new conversation for customer ${customer.id}: ${conversation.id}`);
+      console.log(`Created new conversation for contact ${contact.id}: ${conversation.id}`);
     }
 
     // Create the message
     await prisma.message.create({
       data: {
         text: message.text,
-        sender: 'customer',
+        sender: 'contact',
         externalMessageId: message.mid,
         conversationId: conversation.id,
       },

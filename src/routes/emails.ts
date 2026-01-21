@@ -25,7 +25,10 @@ router.get(
     const search = req.query.search as string | undefined;
 
     try {
-      const where: Prisma.EmailWhereInput = { folder: folder as any };
+      const where: Prisma.EmailWhereInput = {
+        customerId: req.user!.customerId,
+        folder: folder as any,
+      };
 
       if (search) {
         where.OR = [
@@ -96,6 +99,7 @@ router.post(
           folder: 'sent',
           isRead: true,
           userId: req.user!.id,
+          customerId: req.user!.customerId,
         },
       });
 
@@ -139,6 +143,16 @@ router.put(
     const { isRead, folder } = req.body;
 
     try {
+      // First verify the email belongs to this customer
+      const existingEmail = await prisma.email.findFirst({
+        where: { id: emailId, customerId: req.user!.customerId },
+      });
+
+      if (!existingEmail) {
+        res.status(404).json({ error: 'Email not found' });
+        return;
+      }
+
       const email = await prisma.email.update({
         where: { id: emailId },
         data: {

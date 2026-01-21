@@ -9,6 +9,15 @@ const router = Router();
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
+// Generate a slug from company name
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .substring(0, 50) + '-' + Date.now().toString(36);
+}
+
 // Register
 router.post(
   '/register',
@@ -16,6 +25,7 @@ router.post(
     body('email').isEmail().normalizeEmail(),
     body('password').isLength({ min: 6 }),
     body('name').trim().notEmpty(),
+    body('companyName').optional().trim().notEmpty(),
   ],
   async (req: Request, res: Response): Promise<void> => {
     const errors = validationResult(req);
@@ -24,7 +34,7 @@ router.post(
       return;
     }
 
-    const { email, password, name } = req.body;
+    const { email, password, name, companyName } = req.body;
 
     try {
       const existingUser = await prisma.user.findUnique({
@@ -38,18 +48,29 @@ router.post(
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
+      // Create a new customer (tenant) for the user
+      const customerName = companyName || `${name}'s Organization`;
+      const customer = await prisma.customer.create({
+        data: {
+          name: customerName,
+          slug: generateSlug(customerName),
+        },
+      });
+
       const user = await prisma.user.create({
         data: {
           email,
           password: hashedPassword,
           name,
           avatarUrl: `https://picsum.photos/seed/${Date.now()}/100/100`,
+          customerId: customer.id,
         },
         select: {
           id: true,
           email: true,
           name: true,
           avatarUrl: true,
+          customerId: true,
         },
       });
 
@@ -111,6 +132,7 @@ router.post(
           email: user.email,
           name: user.name,
           avatarUrl: user.avatarUrl,
+          customerId: user.customerId,
         },
         token,
       });
@@ -131,6 +153,7 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response): Pr
         email: true,
         name: true,
         avatarUrl: true,
+        customerId: true,
         createdAt: true,
       },
     });
@@ -176,6 +199,7 @@ router.put(
           email: true,
           name: true,
           avatarUrl: true,
+          customerId: true,
         },
       });
 
