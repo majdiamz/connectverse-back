@@ -67,6 +67,8 @@ router.post(
   async (req: RawBodyRequest, res: Response): Promise<void> => {
     const payload = req.body as WebhookPayload;
 
+    console.warn('Messenger webhook called:', JSON.stringify(payload));
+
     // Respond immediately with 200 OK
     // Facebook expects a quick response, so we process asynchronously
     res.status(200).send('EVENT_RECEIVED');
