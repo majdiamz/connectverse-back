@@ -4,6 +4,7 @@ import { prisma } from '../index.js';
 import { authenticateToken, AuthRequest } from '../middleware/auth.js';
 import { Prisma } from '@prisma/client';
 import { sendMessage as sendFacebookMessage } from '../services/facebook.js';
+import { sendWhatsAppMessage } from '../services/whatsapp.js';
 
 const router = Router();
 
@@ -17,6 +18,7 @@ router.get(
     query('search').optional().isString(),
     query('channel').optional().isIn(['whatsapp', 'messenger', 'instagram', 'tiktok']),
     query('status').optional().isIn(['read', 'unread']),
+    query('integrationId').optional().isUUID(),
   ],
   async (req: AuthRequest, res: Response): Promise<void> => {
     const errors = validationResult(req);
@@ -27,9 +29,15 @@ router.get(
 
     const page = (req.query.page as unknown as number) || 1;
     const limit = (req.query.limit as unknown as number) || 10;
-    const { search, channel, status } = req.query;
+    const { search, channel, status, integrationId } = req.query;
 
     try {
+      // Commercial users get empty response (no inbox access)
+      if (req.user!.role === 'commercial') {
+        res.json({ conversations: [], totalPages: 0, currentPage: 1 });
+        return;
+      }
+
       const where: Prisma.ConversationWhereInput = {
         customerId: req.user!.customerId,
       };
@@ -37,6 +45,7 @@ router.get(
       if (channel) where.channel = channel as any;
       if (status === 'read') where.unreadCount = 0;
       if (status === 'unread') where.unreadCount = { gt: 0 };
+      if (integrationId) where.integrationId = integrationId as string;
       if (search) {
         where.contact = {
           OR: [
@@ -213,6 +222,7 @@ router.post(
         },
         include: {
           contact: true,
+          integration: true,
         },
       });
 
@@ -223,8 +233,24 @@ router.post(
 
       let externalMessageId: string | null = null;
 
+      // If this is a WhatsApp conversation with an integration, send via Baileys
+      if (conversation.channel === 'whatsapp' && conversation.integrationId && conversation.contact.externalId) {
+        try {
+          const result = await sendWhatsAppMessage(
+            conversation.integrationId,
+            conversation.contact.externalId,
+            req.body.text
+          );
+          externalMessageId = result.messageId;
+          console.log(`Sent WhatsApp message: ${externalMessageId}`);
+        } catch (waError) {
+          console.error('Failed to send message via WhatsApp:', waError);
+          res.status(502).json({ error: 'Failed to send message via WhatsApp' });
+          return;
+        }
+      }
       // If this is a messenger conversation, send via Facebook Graph API
-      if (conversation.channel === 'messenger' && conversation.contact.externalId) {
+      else if (conversation.channel === 'messenger' && conversation.contact.externalId) {
         const integration = await prisma.integration.findFirst({
           where: {
             customerId: req.user!.customerId,

@@ -28,6 +28,9 @@ import { preserveRawBody } from './middleware/facebookWebhook.js';
 // Import seed function
 import { seedDatabase } from './seed.js';
 
+// Import WhatsApp service
+import { reconnectAllSessions, disconnectAllSessions } from './services/whatsapp.js';
+
 // Initialize Prisma client
 export const prisma = new PrismaClient();
 
@@ -105,6 +108,11 @@ async function main() {
     app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
       console.log(`API available at http://localhost:${PORT}/api`);
+
+      // Reconnect WhatsApp sessions after server starts
+      reconnectAllSessions(prisma).catch((err) =>
+        console.error('Failed to reconnect WhatsApp sessions:', err)
+      );
     });
   } catch (error) {
     console.error('Failed to start server:', error);
@@ -114,11 +122,13 @@ async function main() {
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
+  await disconnectAllSessions();
   await prisma.$disconnect();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
+  await disconnectAllSessions();
   await prisma.$disconnect();
   process.exit(0);
 });

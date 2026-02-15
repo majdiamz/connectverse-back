@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../index.js';
+import { UserRole } from '@prisma/client';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -8,6 +9,7 @@ export interface AuthRequest extends Request {
     email: string;
     name: string;
     customerId: string;
+    role: UserRole;
   };
 }
 
@@ -36,7 +38,7 @@ export const authenticateToken = async (
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      select: { id: true, email: true, name: true, customerId: true },
+      select: { id: true, email: true, name: true, customerId: true, role: true },
     });
 
     if (!user) {
@@ -76,7 +78,7 @@ export const optionalAuth = async (
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      select: { id: true, email: true, name: true, customerId: true },
+      select: { id: true, email: true, name: true, customerId: true, role: true },
     });
 
     if (user) {
@@ -87,4 +89,18 @@ export const optionalAuth = async (
   }
 
   next();
+};
+
+export const requireRole = (...roles: UserRole[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    if (!roles.includes(req.user.role)) {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
+    next();
+  };
 };

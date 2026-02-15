@@ -15,20 +15,36 @@ export async function seedDatabase(prismaClient: PrismaClient) {
   });
   console.log('Created customer (tenant):', customer.name);
 
-  // Create default user (belongs to the customer)
+  // Create default admin user (belongs to the customer)
   const hashedPassword = await bcrypt.hash('password123', 10);
   const user = await prismaClient.user.upsert({
     where: { email: 'alex.green@example.com' },
-    update: { customerId: customer.id },
+    update: { customerId: customer.id, role: 'admin' },
     create: {
       email: 'alex.green@example.com',
       password: hashedPassword,
       name: 'Alex Green',
       avatarUrl: 'https://picsum.photos/seed/user/100/100',
       customerId: customer.id,
+      role: 'admin',
     },
   });
-  console.log('Created user:', user.email);
+  console.log('Created admin user:', user.email);
+
+  // Create commercial user
+  const commercialUser = await prismaClient.user.upsert({
+    where: { email: 'sarah.commercial@example.com' },
+    update: { customerId: customer.id, role: 'commercial' },
+    create: {
+      email: 'sarah.commercial@example.com',
+      password: hashedPassword,
+      name: 'Sarah Commercial',
+      avatarUrl: 'https://picsum.photos/seed/commercial/100/100',
+      customerId: customer.id,
+      role: 'commercial',
+    },
+  });
+  console.log('Created commercial user:', commercialUser.email);
 
   // Contact data (previously Customer data)
   const contactsData: {
@@ -145,19 +161,38 @@ export async function seedDatabase(prismaClient: PrismaClient) {
 
   // Create integrations (scoped to customer)
   const integrations = [
-    { name: 'WhatsApp Business', channel: 'whatsapp' as Channel, description: 'Connect your WhatsApp Business account to manage customer conversations.', status: 'connected' as const },
     { name: 'Facebook Messenger', channel: 'messenger' as Channel, description: 'Integrate Facebook Messenger to respond to customers from your Facebook page.', status: 'connected' as const },
     { name: 'Instagram Direct', channel: 'instagram' as Channel, description: 'Connect Instagram Direct messages for seamless customer communication.', status: 'disconnected' as const },
     { name: 'TikTok Messages', channel: 'tiktok' as Channel, description: 'Manage TikTok messages and engage with your audience.', status: 'disconnected' as const },
   ];
 
   for (const integration of integrations) {
-    await prismaClient.integration.upsert({
-      where: { customerId_channel: { customerId: customer.id, channel: integration.channel } },
-      update: {},
-      create: {
-        ...integration,
+    const existing = await prismaClient.integration.findFirst({
+      where: { customerId: customer.id, channel: integration.channel },
+    });
+    if (!existing) {
+      await prismaClient.integration.create({
+        data: {
+          ...integration,
+          customerId: customer.id,
+        },
+      });
+    }
+  }
+
+  // Create a WhatsApp integration for the commercial user (disconnected)
+  const existingWaIntegration = await prismaClient.integration.findFirst({
+    where: { customerId: customer.id, channel: 'whatsapp', userId: commercialUser.id },
+  });
+  if (!existingWaIntegration) {
+    await prismaClient.integration.create({
+      data: {
+        name: `WhatsApp - ${commercialUser.name}`,
+        channel: 'whatsapp',
+        description: 'WhatsApp Business via QR code connection.',
+        status: 'disconnected',
         customerId: customer.id,
+        userId: commercialUser.id,
       },
     });
   }

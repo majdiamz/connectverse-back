@@ -58,6 +58,11 @@ enum SupportMessageSender {
   support
 }
 
+enum UserRole {
+  admin
+  commercial
+}
+
 // Customer model (tenant/organization)
 model Customer {
   id        String   @id @default(uuid())
@@ -81,6 +86,7 @@ model User {
   password   String
   name       String
   avatarUrl  String?
+  role       UserRole @default(admin)
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
@@ -89,6 +95,7 @@ model User {
   messages        Message[]
   supportMessages SupportMessage[]
   sentEmails      Email[]          @relation("SentEmails")
+  integrations    Integration[]
 
   @@index([customerId])
 }
@@ -143,20 +150,23 @@ model Deal {
 }
 
 model Conversation {
-  id          String   @id @default(uuid())
-  channel     Channel
-  unreadCount Int      @default(0)
-  contactId   String
-  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  customerId  String
-  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String       @id @default(uuid())
+  channel       Channel
+  unreadCount   Int          @default(0)
+  contactId     String
+  contact       Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  customerId    String
+  customer      Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  integrationId String?
+  integration   Integration? @relation(fields: [integrationId], references: [id])
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   messages Message[]
 
   @@index([contactId])
   @@index([customerId])
+  @@index([integrationId])
 }
 
 model Message {
@@ -194,20 +204,25 @@ model Email {
 }
 
 model Integration {
-  id              String            @id @default(uuid())
-  name            String
-  channel         Channel
-  description     String?
-  status          IntegrationStatus @default(disconnected)
-  apiKey          String?           // Page Access Token for Facebook
-  pageId          String?           // Facebook Page ID
-  webhookVerified Boolean           @default(false)
-  customerId      String
-  customer        Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id                  String            @id @default(uuid())
+  name                String
+  channel             Channel
+  description         String?
+  status              IntegrationStatus @default(disconnected)
+  apiKey              String?           // Page Access Token for Facebook
+  pageId              String?           // Facebook Page ID
+  webhookVerified     Boolean           @default(false)
+  whatsappPhoneNumber String?
+  customerId          String
+  customer            Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  userId              String?
+  user                User?             @relation(fields: [userId], references: [id])
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
-  @@unique([customerId, channel])
+  conversations Conversation[]
+
+  @@unique([customerId, channel, userId])
   @@index([customerId])
 }
 

@@ -71,6 +71,7 @@ router.post(
           name: true,
           avatarUrl: true,
           customerId: true,
+          role: true,
         },
       });
 
@@ -133,6 +134,7 @@ router.post(
           name: user.name,
           avatarUrl: user.avatarUrl,
           customerId: user.customerId,
+          role: user.role,
         },
         token,
       });
@@ -154,6 +156,7 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response): Pr
         name: true,
         avatarUrl: true,
         customerId: true,
+        role: true,
         createdAt: true,
       },
     });
@@ -200,6 +203,7 @@ router.put(
           name: true,
           avatarUrl: true,
           customerId: true,
+          role: true,
         },
       });
 

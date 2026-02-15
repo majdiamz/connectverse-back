@@ -81,3 +81,7 @@ Required in `.env`:
 - `JWT_SECRET` - Secret for JWT signing
 - `PORT` - Server port (default: 3001)
 - `CORS_ORIGIN` - Frontend URL for CORS
+
+
+Please see the front project in ../connectverse/
+Please see the product description in ../connectverse/product.me
