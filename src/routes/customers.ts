@@ -81,6 +81,7 @@ router.get(
         channel: c.channel,
         status: c.status,
         dealName: c.dealName,
+        price: c.price,
         dealHistory: c.deals.map((d) => ({
           id: d.id,
           name: d.name,
@@ -214,6 +215,7 @@ router.get(
         channel: contact.channel,
         status: contact.status,
         dealName: contact.dealName,
+        price: contact.price,
         dealHistory: contact.deals.map((d: { id: string; name: string; status: string; amount: number; closeDate: Date | null }) => ({
           id: d.id,
           name: d.name,
@@ -240,6 +242,7 @@ router.put(
     body('phone').optional().trim(),
     body('channel').optional().isIn(['whatsapp', 'messenger', 'instagram', 'tiktok']),
     body('status').optional().isIn(['new', 'contacted', 'qualified', 'unqualified', 'demo', 'won']),
+    body('price').optional().isFloat({ min: 0 }),
   ],
   async (req: AuthRequest, res: Response): Promise<void> => {
     const errors = validationResult(req);
@@ -249,7 +252,7 @@ router.put(
     }
 
     const contactId = req.params.customerId as string;
-    const { name, email, phone, channel, status } = req.body;
+    const { name, email, phone, channel, status, price } = req.body;
 
     try {
       // First verify the contact belongs to this customer
@@ -262,6 +265,20 @@ router.put(
         return;
       }
 
+      // If price is being updated, also update the most recent deal's amount
+      if (price !== undefined) {
+        const latestDeal = await prisma.deal.findFirst({
+          where: { contactId },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (latestDeal) {
+          await prisma.deal.update({
+            where: { id: latestDeal.id },
+            data: { amount: price !== null ? parseFloat(price) : 0 },
+          });
+        }
+      }
+
       const contact = await prisma.contact.update({
         where: { id: contactId },
         data: {
@@ -270,6 +287,7 @@ router.put(
           ...(phone !== undefined && { phone }),
           ...(channel && { channel }),
           ...(status && { status }),
+          ...(price !== undefined && { price: price !== null ? parseFloat(price) : null }),
         },
         include: {
           tags: true,
@@ -288,6 +306,7 @@ router.put(
         channel: contact.channel,
         status: contact.status,
         dealName: contact.dealName,
+        price: contact.price,
         dealHistory: contact.deals.map((d: { id: string; name: string; status: string; amount: number; closeDate: Date | null }) => ({
           id: d.id,
           name: d.name,

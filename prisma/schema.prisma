@@ -112,6 +112,7 @@ model Contact {
   channel    Channel
   status     ContactStatus @default(new)
   dealName   String?
+  price      Float?
   customerId String
   customer   Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
   createdAt  DateTime      @default(now())
