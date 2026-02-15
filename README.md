@@ -90,10 +90,14 @@ Most endpoints require JWT authentication. Include the token in the Authorizatio
 Authorization: Bearer <token>
 ```
 
-### Default User (after seeding)
+### Test Users (after seeding)
 
-- **Email**: alex.green@example.com
-- **Password**: password123
+| Name             | Email                          | Password      | Role       |
+|------------------|--------------------------------|---------------|------------|
+| Alex Green       | alex.green@example.com         | password123   | admin      |
+| Sarah Commercial | sarah.commercial@example.com   | password123   | commercial |
+
+Both users belong to the **ConnectVerse Inc.** tenant.
 
 ## Project Structure
 
