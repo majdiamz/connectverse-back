@@ -99,7 +99,7 @@ router.post(
           folder: 'sent',
           isRead: true,
           userId: req.user!.id,
-          customerId: req.user!.customerId || undefined,
+          customerId: req.user!.customerId!,
         },
       });
 

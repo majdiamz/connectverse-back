@@ -132,7 +132,7 @@ router.post(
           channel,
           status,
           avatarUrl: `https://picsum.photos/seed/${Date.now()}/100/100`,
-          customerId: req.user!.customerId || undefined,
+          customerId: req.user!.customerId!,
         },
         include: {
           tags: true,
@@ -145,7 +145,7 @@ router.post(
         data: {
           channel: contact.channel,
           contactId: contact.id,
-          customerId: req.user!.customerId || undefined,
+          customerId: req.user!.customerId!,
         },
       });
 
@@ -156,7 +156,7 @@ router.post(
         phone: contact.phone,
         avatarUrl: contact.avatarUrl,
         joined: contact.joined.toISOString().split('T')[0],
-        tags: contact.tags.map((t) => t.name),
+        tags: (contact as any).tags.map((t: any) => t.name),
         channel: contact.channel,
         status: contact.status,
         dealName: contact.dealName,
