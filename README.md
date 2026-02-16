@@ -92,12 +92,11 @@ Authorization: Bearer <token>
 
 ### Test Users (after seeding)
 
-| Name             | Email                          | Password      | Role       |
-|------------------|--------------------------------|---------------|------------|
-| Alex Green       | alex.green@example.com         | password123   | admin      |
-| Sarah Commercial | sarah.commercial@example.com   | password123   | commercial |
-
-Both users belong to the **ConnectVerse Inc.** tenant.
+| Name             | Email                          | Password      | Role         | Tenant             |
+|------------------|--------------------------------|---------------|--------------|--------------------|
+| Super Admin      | superadmin@connectverse.com     | password123   | super_admin  | (platform-level)   |
+| Alex Green       | alex.green@example.com         | password123   | admin        | ConnectVerse Inc.  |
+| Sarah Commercial | sarah.commercial@example.com   | password123   | commercial   | ConnectVerse Inc.  |
 
 ## Project Structure
 

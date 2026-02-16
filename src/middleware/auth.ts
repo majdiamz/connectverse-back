@@ -8,7 +8,7 @@ export interface AuthRequest extends Request {
     id: string;
     email: string;
     name: string;
-    customerId: string;
+    customerId: string | null;
     role: UserRole;
   };
 }
@@ -103,4 +103,32 @@ export const requireRole = (...roles: UserRole[]) => {
     }
     next();
   };
+};
+
+export interface TenantAuthRequest extends AuthRequest {
+  user?: AuthRequest['user'] & { customerId: string };
+}
+
+export const requireTenant = (req: AuthRequest, res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    res.status(401).json({ error: 'Authentication required' });
+    return;
+  }
+  if (!req.user.customerId) {
+    res.status(403).json({ error: 'This action requires an organization context' });
+    return;
+  }
+  next();
+};
+
+export const requireSuperAdmin = (req: AuthRequest, res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    res.status(401).json({ error: 'Authentication required' });
+    return;
+  }
+  if (req.user.role !== 'super_admin') {
+    res.status(403).json({ error: 'Super admin access required' });
+    return;
+  }
+  next();
 };

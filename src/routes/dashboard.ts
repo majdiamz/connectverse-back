@@ -8,19 +8,21 @@ const router = Router();
 router.get('/stats', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const customerId = req.user!.customerId;
+    const customerFilter = customerId ? { customerId } : {};
+    const conversationCustomerFilter = customerId ? { conversation: { customerId } } : {};
 
     const [totalConversations, newLeadsCount, openConversations] = await Promise.all([
-      prisma.conversation.count({ where: { customerId } }),
-      prisma.contact.count({ where: { customerId, status: 'new' } }),
-      prisma.conversation.count({ where: { customerId, unreadCount: { gt: 0 } } }),
+      prisma.conversation.count({ where: customerFilter }),
+      prisma.contact.count({ where: { ...customerFilter, status: 'new' } }),
+      prisma.conversation.count({ where: { ...customerFilter, unreadCount: { gt: 0 } } }),
     ]);
 
     // Calculate response rate (mock calculation based on messages)
     const totalMessages = await prisma.message.count({
-      where: { conversation: { customerId } },
+      where: conversationCustomerFilter,
     });
     const userMessages = await prisma.message.count({
-      where: { conversation: { customerId }, sender: 'user' },
+      where: { ...conversationCustomerFilter, sender: 'user' },
     });
     const responseRate = totalMessages > 0 ? Math.round((userMessages / totalMessages) * 100) : 0;
 
@@ -47,7 +49,7 @@ router.get('/conversation-trends', authenticateToken, async (req: AuthRequest, r
 
     const conversations = await prisma.conversation.findMany({
       where: {
-        customerId,
+        ...(customerId ? { customerId } : {}),
         createdAt: { gte: sixMonthsAgo },
       },
       select: {
@@ -99,7 +101,7 @@ router.get('/deals-by-stage', authenticateToken, async (req: AuthRequest, res: R
     const deals = await prisma.deal.groupBy({
       by: ['status'],
       where: {
-        contact: { customerId },
+        ...(customerId ? { contact: { customerId } } : {}),
       },
       _sum: {
         amount: true,
@@ -122,21 +124,22 @@ router.get('/deals-by-stage', authenticateToken, async (req: AuthRequest, res: R
 router.get('/platform-stats', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const customerId = req.user!.customerId;
+    const customerFilter = customerId ? { customerId } : {};
     const channels: ('whatsapp' | 'messenger' | 'instagram' | 'tiktok')[] = ['whatsapp', 'messenger', 'instagram', 'tiktok'];
 
     const stats = await Promise.all(
       channels.map(async (channel) => {
         const totalConversations = await prisma.conversation.count({
-          where: { customerId, channel },
+          where: { ...customerFilter, channel },
         });
         const newLeads = await prisma.contact.count({
-          where: { customerId, channel, status: 'new' },
+          where: { ...customerFilter, channel, status: 'new' },
         });
         const wonContacts = await prisma.contact.count({
-          where: { customerId, channel, status: 'won' },
+          where: { ...customerFilter, channel, status: 'won' },
         });
         const totalContacts = await prisma.contact.count({
-          where: { customerId, channel },
+          where: { ...customerFilter, channel },
         });
 
         return {

@@ -61,6 +61,7 @@ enum SupportMessageSender {
 enum UserRole {
   admin
   commercial
+  super_admin
 }
 
 // Customer model (tenant/organization)
@@ -87,8 +88,8 @@ model User {
   name       String
   avatarUrl  String?
   role       UserRole @default(admin)
-  customerId String
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

@@ -20,6 +20,7 @@ import settingsRoutes from './routes/settings.js';
 import statusRoutes from './routes/status.js';
 import supportRoutes from './routes/support.js';
 import faqRoutes from './routes/faq.js';
+import adminRoutes from './routes/admin.js';
 import messengerWebhookRoutes from './routes/webhooks/messenger.js';
 
 // Import middleware
@@ -69,6 +70,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/status', statusRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/faq', faqRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

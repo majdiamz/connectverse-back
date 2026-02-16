@@ -17,7 +17,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Prom
   try {
     const integrations = await prisma.integration.findMany({
       where: {
-        customerId: req.user!.customerId,
+        customerId: req.user!.customerId || undefined,
         channel: { not: 'whatsapp' },
       },
       orderBy: { name: 'asc' },
@@ -43,7 +43,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response): Prom
 router.get('/whatsapp', authenticateToken, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const where: any = {
-      customerId: req.user!.customerId,
+      customerId: req.user!.customerId || undefined,
       channel: 'whatsapp',
     };
 
@@ -87,7 +87,7 @@ router.post('/whatsapp/connect', authenticateToken, async (req: AuthRequest, res
     // Reuse existing disconnected integration for this user, or create a new one
     let integration = await prisma.integration.findFirst({
       where: {
-        customerId: req.user!.customerId,
+        customerId: req.user!.customerId || undefined,
         channel: 'whatsapp',
         userId: req.user!.id,
         status: 'disconnected',
@@ -106,13 +106,13 @@ router.post('/whatsapp/connect', authenticateToken, async (req: AuthRequest, res
           channel: 'whatsapp',
           description: 'WhatsApp Business via QR code connection.',
           status: 'disconnected',
-          customerId: req.user!.customerId,
+          customerId: req.user!.customerId || undefined,
           userId: req.user!.id,
         },
       });
     }
 
-    await startSession(integration.id, req.user!.customerId, req.user!.id, prisma);
+    await startSession(integration.id, req.user!.customerId || '', req.user!.id, prisma);
 
     res.status(201).json({
       integrationId: integration.id,
@@ -142,7 +142,7 @@ router.get(
     const integration = await prisma.integration.findFirst({
       where: {
         id: integrationId,
-        customerId: req.user!.customerId,
+        customerId: req.user!.customerId || undefined,
       },
     });
 
@@ -173,7 +173,7 @@ router.get(
     const integration = await prisma.integration.findFirst({
       where: {
         id: integrationId,
-        customerId: req.user!.customerId,
+        customerId: req.user!.customerId || undefined,
       },
     });
 
@@ -207,7 +207,7 @@ router.post(
     const integration = await prisma.integration.findFirst({
       where: {
         id: integrationId,
-        customerId: req.user!.customerId,
+        customerId: req.user!.customerId || undefined,
       },
     });
 
@@ -267,7 +267,7 @@ router.post(
       // Use findFirst + create/update instead of upsert on the old unique key
       const existing = await prisma.integration.findFirst({
         where: {
-          customerId: req.user!.customerId,
+          customerId: req.user!.customerId || undefined,
           channel: channel as any,
         },
       });
@@ -291,7 +291,7 @@ router.post(
             apiKey,
             pageId,
             status: 'connected',
-            customerId: req.user!.customerId,
+            customerId: req.user!.customerId || undefined,
           },
         });
       }
@@ -327,7 +327,7 @@ router.post(
     try {
       const existing = await prisma.integration.findFirst({
         where: {
-          customerId: req.user!.customerId,
+          customerId: req.user!.customerId || undefined,
           channel: channel as any,
         },
       });

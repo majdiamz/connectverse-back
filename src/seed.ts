@@ -15,8 +15,22 @@ export async function seedDatabase(prismaClient: PrismaClient) {
   });
   console.log('Created customer (tenant):', customer.name);
 
-  // Create default admin user (belongs to the customer)
+  // Create super admin user (platform-level, no organization)
   const hashedPassword = await bcrypt.hash('password123', 10);
+  const superAdmin = await prismaClient.user.upsert({
+    where: { email: 'superadmin@connectverse.com' },
+    update: { role: 'super_admin', customerId: null },
+    create: {
+      email: 'superadmin@connectverse.com',
+      password: hashedPassword,
+      name: 'Super Admin',
+      role: 'super_admin',
+      customerId: null,
+    },
+  });
+  console.log('Created super admin user:', superAdmin.email);
+
+  // Create default admin user (belongs to the customer)
   const user = await prismaClient.user.upsert({
     where: { email: 'alex.green@example.com' },
     update: { customerId: customer.id, role: 'admin' },

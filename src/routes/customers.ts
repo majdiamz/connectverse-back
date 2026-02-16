@@ -33,7 +33,7 @@ router.get(
 
     try {
       const where: Prisma.ContactWhereInput = {
-        customerId: req.user!.customerId,
+        customerId: req.user!.customerId || undefined,
       };
 
       if (search) {
@@ -132,7 +132,7 @@ router.post(
           channel,
           status,
           avatarUrl: `https://picsum.photos/seed/${Date.now()}/100/100`,
-          customerId: req.user!.customerId,
+          customerId: req.user!.customerId || undefined,
         },
         include: {
           tags: true,
@@ -145,7 +145,7 @@ router.post(
         data: {
           channel: contact.channel,
           contactId: contact.id,
-          customerId: req.user!.customerId,
+          customerId: req.user!.customerId || undefined,
         },
       });
 
@@ -191,7 +191,7 @@ router.get(
       const contact = await prisma.contact.findFirst({
         where: {
           id: contactId,
-          customerId: req.user!.customerId,
+          customerId: req.user!.customerId || undefined,
         },
         include: {
           tags: true,
@@ -257,7 +257,7 @@ router.put(
     try {
       // First verify the contact belongs to this customer
       const existingContact = await prisma.contact.findFirst({
-        where: { id: contactId, customerId: req.user!.customerId },
+        where: { id: contactId, customerId: req.user!.customerId || undefined },
       });
 
       if (!existingContact) {
@@ -346,7 +346,7 @@ router.put(
     try {
       // First verify the contact belongs to this customer
       const existingContact = await prisma.contact.findFirst({
-        where: { id: contactId, customerId: req.user!.customerId },
+        where: { id: contactId, customerId: req.user!.customerId || undefined },
       });
 
       if (!existingContact) {
@@ -417,7 +417,7 @@ router.post(
       const contact = await prisma.contact.findFirst({
         where: {
           id: contactId,
-          customerId: req.user!.customerId,
+          customerId: req.user!.customerId || undefined,
         },
       });
 
@@ -473,7 +473,7 @@ router.post(
       const contacts = await prisma.contact.findMany({
         where: {
           id: { in: contactIds },
-          customerId: req.user!.customerId,
+          customerId: req.user!.customerId || undefined,
         },
         include: {
           tags: true,
@@ -536,7 +536,7 @@ router.get(
 
     try {
       const where: Prisma.ContactWhereInput = {
-        customerId: req.user!.customerId,
+        customerId: req.user!.customerId || undefined,
       };
 
       if (source) where.channel = source as any;

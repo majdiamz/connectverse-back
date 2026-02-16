@@ -38,8 +38,9 @@ router.get(
         return;
       }
 
+      const customerId = req.user!.customerId;
       const where: Prisma.ConversationWhereInput = {
-        customerId: req.user!.customerId,
+        ...(customerId ? { customerId } : {}),
       };
 
       if (channel) where.channel = channel as any;
@@ -134,10 +135,11 @@ router.get(
     const conversationId = req.params.conversationId as string;
 
     try {
+      const customerId = req.user!.customerId;
       const conversation = await prisma.conversation.findFirst({
         where: {
           id: conversationId,
-          customerId: req.user!.customerId,
+          ...(customerId ? { customerId } : {}),
         },
         include: {
           contact: {
@@ -218,7 +220,7 @@ router.post(
       const conversation = await prisma.conversation.findFirst({
         where: {
           id: conversationId,
-          customerId: req.user!.customerId,
+          ...(req.user!.customerId ? { customerId: req.user!.customerId } : {}),
         },
         include: {
           contact: true,
@@ -253,7 +255,7 @@ router.post(
       else if (conversation.channel === 'messenger' && conversation.contact.externalId) {
         const integration = await prisma.integration.findFirst({
           where: {
-            customerId: req.user!.customerId,
+            ...(req.user!.customerId ? { customerId: req.user!.customerId } : {}),
             channel: 'messenger',
           },
         });
@@ -326,7 +328,7 @@ router.put(
       const conversation = await prisma.conversation.findFirst({
         where: {
           id: conversationId,
-          customerId: req.user!.customerId,
+          ...(req.user!.customerId ? { customerId: req.user!.customerId } : {}),
         },
       });
 
@@ -376,7 +378,7 @@ router.get(
       const conversation = await prisma.conversation.findFirst({
         where: {
           id: conversationId,
-          customerId: req.user!.customerId,
+          ...(req.user!.customerId ? { customerId: req.user!.customerId } : {}),
         },
       });
 
