@@ -1,6 +1,22 @@
 import { PrismaClient, Channel, ContactStatus, DealStatus, MessageSender } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
+export async function createSuperAdmin(prismaClient: PrismaClient) {
+  const hashedPassword = await bcrypt.hash('password123', 10);
+  const superAdmin = await prismaClient.user.upsert({
+    where: { email: 'superadmin@connectverse.com' },
+    update: { role: 'super_admin', customerId: null },
+    create: {
+      email: 'superadmin@connectverse.com',
+      password: hashedPassword,
+      name: 'Super Admin',
+      role: 'super_admin',
+      customerId: null,
+    },
+  });
+  console.log('Created super admin user:', superAdmin.email);
+}
+
 export async function seedDatabase(prismaClient: PrismaClient) {
   console.log('Seeding database...');
 

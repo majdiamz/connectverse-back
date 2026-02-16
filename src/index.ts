@@ -27,7 +27,7 @@ import messengerWebhookRoutes from './routes/webhooks/messenger.js';
 import { preserveRawBody } from './middleware/facebookWebhook.js';
 
 // Import seed function
-import { seedDatabase } from './seed.js';
+import { seedDatabase, createSuperAdmin } from './seed.js';
 
 // Import WhatsApp service
 import { reconnectAllSessions, disconnectAllSessions } from './services/whatsapp.js';
@@ -91,8 +91,14 @@ const PORT = process.env.PORT || 3001;
 
 async function main() {
   try {
-    // Auto-setup database if AUTO_SEED environment variable is set
-    if (process.env.AUTO_SEED === 'true') {
+    // AUTO_CLEAN: reset all tables and create only the super admin user (for production deployment)
+    if (process.env.AUTO_CLEAN === 'true') {
+      console.log('AUTO_CLEAN enabled, resetting database...');
+      execSync('npx prisma db push --force-reset --skip-generate', { stdio: 'inherit' });
+      console.log('Database reset successfully');
+    }
+    // AUTO_SEED: push schema and seed with sample data (for development)
+    else if (process.env.AUTO_SEED === 'true') {
       console.log('AUTO_SEED enabled, pushing database schema...');
       execSync('npx prisma db push --skip-generate', { stdio: 'inherit' });
       console.log('Database schema pushed successfully');
@@ -101,8 +107,12 @@ async function main() {
     await prisma.$connect();
     console.log('Connected to database');
 
+    if (process.env.AUTO_CLEAN === 'true') {
+      console.log('Creating super admin user...');
+      await createSuperAdmin(prisma);
+    }
     // Seed database after schema is ready
-    if (process.env.AUTO_SEED === 'true') {
+    else if (process.env.AUTO_SEED === 'true') {
       console.log('Seeding database...');
       await seedDatabase(prisma);
     }
